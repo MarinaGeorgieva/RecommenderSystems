@@ -14,8 +14,11 @@ import java.util.Date;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.FieldType;
 import org.apache.lucene.document.StoredField;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -31,15 +34,15 @@ public class Recommender {
 	private static final String INDEX_DIR = "Index";
 	private static final String DOCS_DIR = "20_newsgroups";
 	
-//	public static void main(String[] args) throws Exception {
-//		
-////		UserProfile.index();
-//		String userProfile = UserProfile.get();
-//		
-////		Recommender.createIndex();
-//		
-//		Recommender.getKeywords(userProfile);
-//	}
+	public static void main(String[] args) throws Exception {
+		
+//		UserProfile.index();
+		String userProfile = UserProfile.get();
+		
+		Recommender.createIndex();
+		
+		Recommender.getKeywords(userProfile);
+	}
 	
 	private static void getKeywords(String userProfile) throws IOException {
 		Path indexDirectory = Paths.get(INDEX_DIR);
@@ -116,8 +119,16 @@ public class Recommender {
 				        e.printStackTrace();
 				    }
 					
-					Document doc = new Document();
-					doc.add(new StoredField("content", contentBuilder.toString()));
+					FieldType fieldType = new FieldType();
+					fieldType.setTokenized(true);
+					fieldType.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
+					fieldType.setStored(true);
+					fieldType.setStoreTermVectors(true);
+					fieldType.setStoreTermVectorPositions(true);
+					Field field = new Field("content", contentBuilder.toString(), fieldType);
+					
+					Document doc = new Document();		
+					doc.add(field);
 					
 					writer.addDocument(doc);
 				}

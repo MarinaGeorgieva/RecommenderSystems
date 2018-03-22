@@ -13,12 +13,13 @@ import java.nio.file.Paths;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.document.StoredField;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.FieldType;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.queries.mlt.MoreLikeThis;
 import org.apache.lucene.search.IndexSearcher;
@@ -32,28 +33,28 @@ public class UserProfile {
 	private static final String USER_PROFILE_INDEX_DIR = "UserProfileIndex";
 	private static final String USER_PROFILE_DOCS_DIR = "user_profile";
 	
-	public static void main(String[] args) throws Exception {
-		
-		UserProfile.index();
-		UserProfile.extractKeywords();
-//		System.out.println("Total files indexed for user profile: " + numIndexed);
-		
-		
-//		Map<String, Double> map = profile.extractKeywords();
-		
-		
-//		Directory directory = FSDirectory.open(new File(userProfileIndexDirectory));
-//		IndexReader indexReader = DirectoryReader.open(directory);
+//	public static void main(String[] args) throws Exception {
 //		
-//		DocFreqComparator cmp = new HighFreqTerms.DocFreqComparator();
-//		TermStats[] highFreqTerms = HighFreqTerms.getHighFreqTerms(indexReader, 10, "content", cmp);
-//
-//		List<String> terms = new ArrayList<>(highFreqTerms.length);
-//		for (TermStats ts : highFreqTerms) {
-//		    terms.add(ts.termtext.utf8ToString());
-//		    System.out.println("High freq terms: " + ts.termtext.utf8ToString());
-//		}
-	}
+//		UserProfile.index();
+//		UserProfile.get();
+////		System.out.println("Total files indexed for user profile: " + numIndexed);
+//		
+//		
+////		Map<String, Double> map = profile.extractKeywords();
+//		
+//		
+////		Directory directory = FSDirectory.open(new File(userProfileIndexDirectory));
+////		IndexReader indexReader = DirectoryReader.open(directory);
+////		
+////		DocFreqComparator cmp = new HighFreqTerms.DocFreqComparator();
+////		TermStats[] highFreqTerms = HighFreqTerms.getHighFreqTerms(indexReader, 10, "content", cmp);
+////
+////		List<String> terms = new ArrayList<>(highFreqTerms.length);
+////		for (TermStats ts : highFreqTerms) {
+////		    terms.add(ts.termtext.utf8ToString());
+////		    System.out.println("High freq terms: " + ts.termtext.utf8ToString());
+////		}
+//	}
 	
 //	public Map<String, Double> extractKeywords() throws IOException {
 //		Map<String, Double> wordIdf = new HashMap<>();
@@ -86,11 +87,15 @@ public class UserProfile {
 //		return idfTop15;
 //	}
 	
-	private static void extractKeywords() throws IOException {
+	public static String get() throws IOException {
 		Path indexDirectory = Paths.get(USER_PROFILE_INDEX_DIR);
 		Directory dir = FSDirectory.open(indexDirectory);
 		
 		IndexReader indexReader = DirectoryReader.open(dir);
+		
+//		Terms terms = indexReader.getTermVector(0, "content");
+//		System.out.println(terms.size());
+		
 		IndexSearcher searcher = new IndexSearcher(indexReader);
 		Analyzer analyzer = new StandardAnalyzer();
 		
@@ -98,6 +103,7 @@ public class UserProfile {
 		TFIDFSimilarity similarity = new ClassicSimilarity();
 		MoreLikeThis mlt = new MoreLikeThis(indexReader, similarity);
 		mlt.setAnalyzer(analyzer);
+		mlt.setFieldNames(new String[] { "content" });
 		mlt.setBoost(true);
 		mlt.setMinTermFreq(1);
 		mlt.setMinDocFreq(1);
@@ -105,23 +111,20 @@ public class UserProfile {
 		Document doc = indexReader.document(0);
 		IndexableField field = doc.getField("content");
 		String userProfile = field.stringValue();
-		System.out.println(userProfile);
+//		System.out.println(userProfile);
 		
-		Reader reader = new StringReader(userProfile);
+//		Reader reader = new StringReader(userProfile);
+//		
+//		System.out.println("------------------------------KEYWORDS-----------------------------------");
+//		String[] keywords = mlt.retrieveInterestingTerms(reader, "content");
+//		for (String keyword : keywords) {
+//			System.out.println(keyword);
+//		}
 		
-		System.out.println("------------------------------KEYWORDS-----------------------------------");
-		String[] keywords = mlt.retrieveInterestingTerms(reader, "content");
-		for (String keyword : keywords) {
-			System.out.println(keyword);
-		}
-	}
-
-	private static void generate() {
-		
+		return userProfile;
 	}
 	
-	private static void index() throws IOException {
-		boolean create = true;
+	public static void index() throws IOException {
 		
 		Path docsDirectory = Paths.get(USER_PROFILE_DOCS_DIR);
 		if (!Files.isReadable(docsDirectory)) {
@@ -136,14 +139,6 @@ public class UserProfile {
 			Directory dir = FSDirectory.open(indexDirectory);
 			Analyzer analyzer = new StandardAnalyzer();
 			IndexWriterConfig config = new IndexWriterConfig(analyzer);
-			
-			if (create) {
-				// Create a new index in the directory, removing any previously indexed documents:
-				config.setOpenMode(OpenMode.CREATE);
-			} else {
-				// Add new documents to an existing index:
-				config.setOpenMode(OpenMode.CREATE_OR_APPEND);
-			}
 			
 			IndexWriter writer = new IndexWriter(dir, config);
 			
@@ -177,7 +172,16 @@ public class UserProfile {
 			
 			System.out.println("Adding user profile document...");
 			Document doc = new Document();
-			doc.add(new StoredField("content", contentBuilder.toString()));	
+			FieldType fieldType = new FieldType();
+			fieldType.setTokenized(true);
+			fieldType.setIndexOptions(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS);
+			fieldType.setStored(true);
+			fieldType.setStoreTermVectors(true);
+			fieldType.setStoreTermVectorPositions(true);
+			Field field = new Field("content", contentBuilder.toString(), fieldType);
+			
+//			doc.add(new TextField("content", contentBuilder.toString(), Store.YES));	
+			doc.add(field);
 			writer.addDocument(doc);
 			
 			writer.close();
