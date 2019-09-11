@@ -4,6 +4,13 @@
 .project
 .settings/
 
+# Mac
+.DS_Store
+
+# Maven
+log/
+target/
+
 # Compiled class file
 *.class
 
